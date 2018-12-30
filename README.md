@@ -1,6 +1,7 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+
 - [Advanced Node](#advanced-node)
   - [Intro](#intro)
     - [Node's Architecture: V9 and libuv](#nodes-architecture-v9-and-libuv)
@@ -30,6 +31,9 @@
     - [Practical Example: Task List Manager](#practical-example-task-list-manager)
   - [Node for Networking](#node-for-networking)
     - [TCP Networking with the Net Module](#tcp-networking-with-the-net-module)
+    - [Working with Multiple Sockets](#working-with-multiple-sockets)
+    - [Improving the Chat Server](#improving-the-chat-server)
+    - [The DNS Module](#the-dns-module)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1337,3 +1341,183 @@ rl.on("line", input => {
 ## Node for Networking
 
 ### TCP Networking with the Net Module
+
+[Example](examples/networking/basic-server.js)
+
+Use `net` module's `createServer` method:
+
+```javascript
+process.stdout.write("\u001B[2J\u001B[0;0f");
+const server = require("net").createServer();
+
+// register connection handler that fires every time a client connects to this server
+// handler exposes connected socket
+// socket object implements duplex stream interface - i.e. can read and write to it
+server.on("connection", socket => {
+  console.log("Client connected");
+  socket.write("Welcome new client!\n");
+});
+
+// Run server by listening on a port
+server.listen(8000, () => console.log("Server bound"));
+```
+
+To test, in one tab, run: `node basic-server.js`, in another, use netcat:
+
+```shell
+nc localhost 8000 # welcome message sent to client
+```
+
+Node process keeps running because connection not terminated.
+
+Client can write to socket but we have to register a handler to read from the socket.
+
+socket === duplex stream -> i.e. socket is also an event emitter. Can listen to `data` event on socket. Handler for this event exposes buffer object.
+
+```javascript
+socket.on("data", data => {
+  console.log("data is:", data);
+});
+```
+
+To test, in client console type in any text such as `hello`. Will be received by server as buffer, eg:
+
+```
+data is: <Buffer 68 65 6c 6c 6f 0a>
+```
+
+Buffer - node does not assume any encoding so client could be typing in any language.
+
+To echo data back to user, use `socket.write`:
+
+```javascript
+socket.on("data", data => {
+  console.log("data is:", data);
+  socket.write("data is: ");
+  socket.write(data); // if not specified, assumes UTF8 encoding so data will be echoed back to client as string
+});
+```
+
+Can set encoding globally:
+
+```javascript
+socket.setEncoding("utf8"); // data argument on data event will now be a string
+```
+
+Use socket `end` event to handle when client disconnects, then can no longer write to the socket:
+
+```javascript
+socket.on("end", () => {
+  console.log("Client disconnected");
+});
+```
+
+To test, disconnect netcat session with control+D
+
+### Working with Multiple Sockets
+
+[Multiple Sockets](examples/networking/multiple-sockets.js)
+
+In previous example, many clients can connect to same server, just open more terminal windows and start netcat session. Each connected client gets its own socket. Modify example to give each socket a unique id.
+
+```javascript
+let counter = 0;
+...
+server.on('connection', socket => {
+  socket.id = counter++;
+  ...
+  socket.on("data", data => {
+    socket.write(`${socket.id}: `);
+    ...
+  });
+});
+```
+
+To make clients "chat" with each other, when server receives data on one socket, it should write to all connected sockets. Need to keep track of all connected sockets and loop over them in `data` handler. Use `sockets` object for tracking:
+
+```javascript
+let counter = 0;
+let sockets = {};
+// ...
+server.on("connection", socket => {
+  socket.id = counter++;
+  sockets[socket.id] = socket;
+  // ...
+});
+// ...
+socket.on("data", data => {
+  Object.entries(sockets).forEach(([, clientSocket]) => {
+    clientSocket.write(`${socket.id}: `);
+    clientSocket.write(data);
+  });
+});
+```
+
+Now we have a chat server because every connected client receives all messages from every other connected client.
+
+But if one client disconnects, then another client sends data, chat server will crash because trying to write to connection that was closed.
+
+To fix this, on `end` event, delete the socket from `sockets` tracker object:
+
+```javascript
+socket.on("end", () => {
+  delete sockets[socket.id];
+});
+```
+
+### Improving the Chat Server
+
+[Chat Server](examples/networking/chat-server.js)
+
+Usually with chat, don't get echo back of your own message. Fix this with condition on `data` method:
+
+```javascript
+socket.on("data", data => {
+  Object.entries(sockets).forEach(([key, clientSocket]) => {
+    if (socket.id == key) return;
+    clientSocket.write(`${socket.id}: `);
+    clientSocket.write(data);
+  });
+});
+```
+
+Further improvement, rather than identifying clients by id/number, ask for their name when they connect. This means first data event after initial connection will be client's name. Need condition to capture this.
+
+```javascript
+server.on("connection", socket => {
+  // ...
+  socket.write("Please type your name: ");
+  // ...
+  socket.on("data", data => {
+    if (!sockets[socket.id]) {
+      // if get here, have not yet registered this client, capture their name now
+      socket.name = data.toString().trim();
+      socket.write(`Welcome ${socket.name}!\n`);
+      sockets[socket.id] = socket;
+      return;
+    }
+    Object.entries(sockets).forEach(([key, clientSocket]) => {
+      if (socket.id == key) return;
+      clientSocket.write(`${socket.name}: `);
+      clientSocket.write(data);
+    });
+  });
+});
+```
+
+Another improvement - show timestamp on each message:
+
+```javascript
+function timestamp() {
+  const now = new Date();
+  return `${now.getHours()}:${now.getMinutes()}`;
+}
+// ...
+Object.entries(sockets).forEach(([key, clientSocket]) => {
+  if (socket.id == key) return;
+  clientSocket.write(`${socket.name} ${timestamp()}: `);
+  clientSocket.write(data);
+});
+```
+
+### The DNS Module
