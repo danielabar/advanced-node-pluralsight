@@ -133,7 +133,7 @@ When declaring a variabel in a module, it's local to that module and cannot be a
 // util.js
 var answer = 42;
 // index.js
-require('./util);
+require("./util");
 console.log(answer); // ReferenceError: answer is not defined
 ```
 
@@ -143,7 +143,7 @@ But if a variable is defined on the global object, it's available everywhere:
 // util.js
 global.answer = 42;
 // index.js
-require('./util);
+require("./util");
 console.log(answer); // 42
 ```
 
@@ -195,8 +195,8 @@ export const config = {
   port: process.env.PORT || 8080
 };
 // index.js
-const { config } = require('./util);
-config.port // 8080 of PORT env not set
+const { config } = require("./util");
+config.port; // 8080 of PORT env not set
 ```
 
 To display latest used LTS release: `node -p "process.release.lts"` (eg: `Carton`). If not on an LTS release will return `undefined`. Can use to show a warning if production is being started on a non-LTS version.
@@ -1167,16 +1167,16 @@ Timers run in a different phase than most I/O operations.
 Example - this code always displays `immediate` _before_ `timeout`, even though `setTimeout` is run before `setImmediate`.
 
 ```javascript
-const fs = require('fs);
+const fs = require("fs");
 
 fs.readFile(__filename, () => {
   setTimeout(() => {
-    console.log('timeout');
+    console.log("timeout");
   }, 0);
   setImmediate(() => {
-    console.log('immediate');
+    console.log("immediate");
   });
-})
+});
 ```
 
 _Always use setImmediate when you want something executed on next tick of event loop_
@@ -1246,7 +1246,7 @@ For EventEmitter, can use as many arguments as you wish after named event, all a
 this.emit("data", data);
 // ...
 // data argument from emitter is available to registered listener function:
-withTime.on('data, (data) => {
+withTime.on("data", data => {
   console.log(`length: ${data.length}`);
 });
 ```
