@@ -1,7 +1,6 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-
 - [Advanced Node](#advanced-node)
   - [Intro](#intro)
     - [Node's Architecture: V9 and libuv](#nodes-architecture-v9-and-libuv)
@@ -1521,3 +1520,55 @@ Object.entries(sockets).forEach(([key, clientSocket]) => {
 ```
 
 ### The DNS Module
+
+[Example](examples/dns.js)
+
+Use to translate network name to address and vice versa.
+
+`lookup` function looks up address by host and returns err first callback:
+
+```javascript
+const dns = require("dns");
+
+dns.lookup("pluralsight.com", (err, address) => {
+  console.log(address); // 54.191.212.90
+});
+```
+
+`lookup` method doesn't perform network request directly, uses underlying OS facilities to perform name resolution. This mean sit uses `libuv` threads. All other `dns` methods use network directly so do not need `libuv` threads.
+
+Equivalent to `lookup` is `resolve4` which will return array of addresses in case domain has multiple A records
+
+```javascript
+dns.resolve4("pluralsight.com", (err, address) => {
+  console.log(address); // [ '54.191.217.222', '54.70.118.65', '54.191.212.90' ]
+});
+```
+
+Using `resolve` method returns same result as `resolve4` because default second argument is `A`:
+
+```javascript
+dns.resolve("pluralsight.com", "A", (err, address) => {
+  console.log(`resolve A: ${JSON.stringify(address)}`);
+});
+```
+
+Can resolve other types:
+
+```javascript
+dns.resolve("pluralsight.com", "MX", (err, address) => {
+  console.log(`resolve MX: ${JSON.stringify(address)}`);
+  // [{"exchange":"us-smtp-inbound-1.mimecast.com","priority":10},{"exchange":"us-smtp-inbound-2.mimecast.com","priority":20}]
+});
+```
+
+All the types have equivalent method names, eg `dns.resolveMx`.
+
+`reverse` method takes in IP and returns err first callback with hostnames:
+
+```javascript
+dns.reverse("54.70.118.65", (err, hostnames) => {
+  console.log(`reverse: ${JSON.stringify(hostnames)}`);
+  // ["ec2-54-70-118-65.us-west-2.compute.amazonaws.com"]
+});
+```
