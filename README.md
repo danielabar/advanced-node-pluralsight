@@ -1,7 +1,6 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-
 - [Advanced Node](#advanced-node)
   - [Intro](#intro)
     - [Node's Architecture: V9 and libuv](#nodes-architecture-v9-and-libuv)
@@ -35,6 +34,8 @@
     - [Improving the Chat Server](#improving-the-chat-server)
     - [The DNS Module](#the-dns-module)
     - [UDP Datagram Sockets](#udp-datagram-sockets)
+  - [Node for Web](#node-for-web)
+    - [The Basic Streaming HTTP Server](#the-basic-streaming-http-server)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1586,3 +1587,97 @@ Every time new socket is created, will use a different port.
 First argument to `send` can be string or Buffer. When using buffer, must specify where to start (offset) and length to send.
 
 Can also send array of messages.
+
+## Node for Web
+
+### The Basic Streaming HTTP Server
+
+[Hello Server](examples/hello-server.js)
+
+http module designed for streaming and low latency.
+
+http module's `createServer` method returns an event emitter. One of events it responds to is `request`, which occurs every time a client connects to this http server.
+
+request event handler exposes http request and response objects in callback.
+
+response object `res` is used to modify the response node will send for that request.
+
+```javascript
+const server = require("http").createServer();
+
+server.on("request", (req, res) => {
+  res.writeHead(200, { "content-type": "text/plain" });
+  res.end("Hello world\n");
+});
+
+server.listen(8000);
+```
+
+To test, run `node hello-server.js` in one terminal window, process will remain alive because there is a listener handler. Then open another terminal window and enter `curl -i localhost:8000`.
+
+```shell
+HTTP/1.1 200 OK
+content-type: text/plain
+Date: Mon, 31 Dec 2018 15:59:38 GMT
+Connection: keep-alive
+Transfer-Encoding: chunked
+
+Hello world
+```
+
+`Conection: keep-alive` - connection to web server will be persisted. TCP connection will not be killed after requester receives response so that multiple requests can be sent on same connection.
+
+`Transfer-Encoding: chunked` - used to send variable length response text. Response is being streamed. i.e. node can stream portions of the response as its ready, rather than buffering everything in memory then sending the whole thing at once.
+
+Connection not terminated but browser knows content is done via HTTP/1.1 protocol, which has a way to terminate the message (done via `res.end` function).
+
+In this example, client will not be terminated because message is still streaming:
+
+```javascript
+server.on("request", (req, res) => {
+  res.writeHead(200, { "content-type": "text/plain" });
+  // do not terminate, client will wait because node is still streaming
+  res.write("Hello world\n");
+
+  // write another message after one second
+  setTimeout(function() {
+    res.write("Another Hello world\n");
+  }, 1000);
+
+  // write another message after two seconds
+  setTimeout(function() {
+    res.write("Yet Another Hello world\n");
+  }, 2000);
+});
+```
+
+Can also increase the timeout values and have multiple clients submit requests. Node uses event loop to fulfill them "concurrently" using same node process.
+
+Terminating response object with call to `end` method is not optional. Must be done for every request otherwise request will timeout. For example, calling `write` after default timeout of 2 minutes:
+
+```javascript
+setTimeout(function() {
+  res.write("Ain't gonna happen\n");
+}, 130000);
+```
+
+```shell
+curl -i localhost:8000
+HTTP/1.1 200 OK
+content-type: text/plain
+Date: Mon, 31 Dec 2018 16:12:29 GMT
+Connection: keep-alive
+Transfer-Encoding: chunked
+
+Hello world
+Another Hello world
+Yet Another Hello world
+curl: (18) transfer closed with outstanding read data remaining
+```
+
+Timeout call be controlled with server `timeout` property:
+
+```javascript
+server.timeout = 500;
+server.listen(8000);
+```
