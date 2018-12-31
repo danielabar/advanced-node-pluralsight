@@ -1,6 +1,7 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+
 - [Advanced Node](#advanced-node)
   - [Intro](#intro)
     - [Node's Architecture: V9 and libuv](#nodes-architecture-v9-and-libuv)
@@ -33,6 +34,7 @@
     - [Working with Multiple Sockets](#working-with-multiple-sockets)
     - [Improving the Chat Server](#improving-the-chat-server)
     - [The DNS Module](#the-dns-module)
+    - [UDP Datagram Sockets](#udp-datagram-sockets)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1572,3 +1574,15 @@ dns.reverse("54.70.118.65", (err, hostnames) => {
   // ["ec2-54-70-118-65.us-west-2.compute.amazonaws.com"]
 });
 ```
+
+### UDP Datagram Sockets
+
+[Example](examples/udp.js)
+
+Use `dgram` module - implementation for udp datagram sockets. For simplicity, example includes server and client implementation in same file.
+
+Every time new socket is created, will use a different port.
+
+First argument to `send` can be string or Buffer. When using buffer, must specify where to start (offset) and length to send.
+
+Can also send array of messages.
