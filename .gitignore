@@ -1,1 +1,3 @@
 examples/know-npm/node_modules
+*.pem
+*.crt

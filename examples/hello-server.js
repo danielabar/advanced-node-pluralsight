@@ -1,3 +1,4 @@
+// server: http.Server
 const server = require("http").createServer();
 
 // server.on("request", (req, res) => {
@@ -8,6 +9,8 @@ const server = require("http").createServer();
 
 // experiment - do not terminate
 server.on("request", (req, res) => {
+  // req: http.IncomingMessage
+  // res: http.ServerResponse
   res.writeHead(200, { "content-type": "text/plain" });
   // do not terminate, client will wait because node is still streaming
   res.write("Hello world\n");

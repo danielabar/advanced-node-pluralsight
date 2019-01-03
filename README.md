@@ -1,6 +1,7 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+
 - [Advanced Node](#advanced-node)
   - [Intro](#intro)
     - [Node's Architecture: V9 and libuv](#nodes-architecture-v9-and-libuv)
@@ -36,6 +37,8 @@
     - [UDP Datagram Sockets](#udp-datagram-sockets)
   - [Node for Web](#node-for-web)
     - [The Basic Streaming HTTP Server](#the-basic-streaming-http-server)
+    - [Working with HTTPS](#working-with-https)
+    - [Requesting HTTP/HTTPS Data](#requesting-httphttps-data)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1603,9 +1606,12 @@ request event handler exposes http request and response objects in callback.
 response object `res` is used to modify the response node will send for that request.
 
 ```javascript
+// server: http.Server
 const server = require("http").createServer();
 
 server.on("request", (req, res) => {
+  // req: http.IncomingMessage
+  // res: http.ServerResponse
   res.writeHead(200, { "content-type": "text/plain" });
   res.end("Hello world\n");
 });
@@ -1681,3 +1687,167 @@ Timeout call be controlled with server `timeout` property:
 server.timeout = 500;
 server.listen(8000);
 ```
+
+### Working with HTTPS
+
+[Example](examples/https/https.js) Didn't work!
+
+HTTPS is http protocol over TLS/SSL. Node has a separate module `https` for this, similar to http module.
+
+`createServer` method must be provided with an options object. `key` and `cert` can be buffer or string. `pfx` option can be used to combine key and cert.
+
+Use `openssl` toolkit to generate a cert. Generate a private key (encrypted or not), generate a certificate signing request and self-sign cert to test it. Browser will not trust self-signed cert but its fine for simple demo.
+
+Can combine all steps into one command to output private key and certificate file. Use default answers to all questions (just for this test):
+
+```shell
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -nodes
+```
+
+Specify the generated `key.pem` and `cert.pem` files for `key` and `cert` options respectively. Also change port to 443 (default for https):
+
+```javascript
+const fs = require("fs");
+
+const server = require("https").createServer({
+  key: fs.readFileSync("./key.pem"),
+  cert: fs.readFileSync("./cert.pem")
+});
+
+server.on("request", (req, res) => {
+  res.writeHead(200, { "content-type": "text/plain" });
+  res.end("Hello world\n");
+});
+
+server.listen(443);
+```
+
+### Requesting HTTP/HTTPS Data
+
+[Example](examples/basic-request.js)
+
+Node can be used as a client for request http/s data.
+
+Major classes in `http` module:
+
+- `http.Server` use to create a basic server, inherits from `net.Server` so it's an event emitter
+- `http.ServerResponse` object created internally by `http.Server`.
+- `http.Agent` used to manage pooling sockets used in http client requests. Node uses `globalAgent` by default but can also create a different agent with different options `new Agent()`.
+- `http.ClientRequest` used to initiate an http request, different from request object seen in [hello server](examples/hello-server.js) example, that request was instance of `http.IncomingMessage`.
+
+`ClientRequest` and `ServerResponse` implement `WritableStream` interface.
+
+`IncomingMessage` implements `ReadableStream` interface.
+
+All 3 of above are event emitters.
+
+Use http module's `request` method, which takes an options object, and provides a callback with response from host that is being requested.
+
+Notice that callback handler doesn't have `err` object. Because handler is registered as event listener, error handled with another event listener.
+
+`request` method returns an event emitter object, which is a writeable stream.
+
+```javascript
+const http = require("http");
+
+const req = http.request(
+  {
+    hostname: "www.google.com",
+    method: "GET" // default
+  },
+  res => {
+    console.log(res);
+  }
+);
+
+req.on("error", err => console.log(err));
+
+// need to terminate the stream
+req.end();
+```
+
+To test, pipe through `less` because output is large: `node basic-request.js | less`
+
+Notice response object is an `IncomingMessage`. Properties include `statusCode`, `headers`.
+
+Response object is also an event emitter, emits `data` event when it receives data from `hostname`. `data` event provides callback with data argument that is a Buffer. Can call `toString()` on buffer to see html content returned from hostname.
+
+```javascript
+const req = http.request(
+  {
+    hostname: "www.google.com",
+    method: "GET" // default
+  },
+  res => {
+    // console.log(res);
+    console.log(res.statusCode);
+    console.log(res.headers);
+
+    res.on("data", data => {
+      console.log(data.toString());
+    });
+  }
+);
+```
+
+If not writing to headers and not posting/putting/deleting data, can use `http.get` method instead of `http.request`, simpler:
+
+[Example](examples/basic-get.js)
+
+- First argument is string with url to be read rather than options object.
+- Don't need `req.end()`, handled by `req.get`.
+
+```javascript
+const http = require("http");
+
+// req: http.ClientRequest
+const req = http.get("http://www.google.com", res => {
+  // res: http.IncomingMessage
+  console.log(res.statusCode);
+  console.log(res.headers);
+
+  res.on("data", data => {
+    console.log(data.toString());
+  });
+});
+
+req.on("error", err => console.log(err));
+
+console.log(req.agent); // http.Agent
+```
+
+This is done using global http agent, inspect http module at node repl for `http.globalAgent`:
+
+```
+> http.globalAgent
+Agent {
+  domain:
+   Domain {
+     domain: null,
+     _events: { error: [Function: debugDomainError] },
+     _eventsCount: 1,
+     _maxListeners: undefined,
+     members: [] },
+  _events: { free: [Function] },
+  _eventsCount: 1,
+  _maxListeners: undefined,
+  defaultPort: 80,
+  protocol: 'http:',
+  options: { path: null },
+  requests: {},
+  sockets: {},
+  freeSockets: {},
+  keepAliveMsecs: 1000,
+  keepAlive: false,
+  maxSockets: Infinity,
+  maxFreeSockets: 256 }
+```
+
+Can also access agent info programmatically:
+
+```javascript
+const req = http.get(...);
+console.log(req.agent);
+```
+
+Interface is exactly the same for working with `https` rather than `http`.
