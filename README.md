@@ -39,6 +39,7 @@
     - [The Basic Streaming HTTP Server](#the-basic-streaming-http-server)
     - [Working with HTTPS](#working-with-https)
     - [Requesting HTTP/HTTPS Data](#requesting-httphttps-data)
+    - [Working with Routes](#working-with-routes)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1851,3 +1852,186 @@ console.log(req.agent);
 ```
 
 Interface is exactly the same for working with `https` rather than `http`.
+
+### Working with Routes
+
+[Example](examples/routes.js)
+
+Want to suport routes like `/api`, `/home`. To do so, need to read url information from incoming request from `req.url`.
+
+```javascript
+const server = require("http").createServer();
+
+server.on("request", (req, res) => {
+  console.log(req.url);
+  res.writeHead(200, { "content-type": "text/plain" });
+  res.end("Hello world\n");
+});
+
+server.listen(8000);
+```
+
+To test, run in one terminal `node examples/routes.js`, then test with `curl` in another terminal:
+
+```shell
+$ curl -i localhost:8000
+# server outputs: /
+$ curl -i localhost:8000/home
+# server outputs: /home
+```
+
+To handle routes, add a switch statement on `req.url`. This example will return `home.html` in response to `/home`:
+
+```javascript
+const fs = require("fs");
+const server = require("http").createServer();
+
+server.on("request", (req, res) => {
+  switch (req.url) {
+    case "/home":
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(fs.readFileSync("./home.html"));
+      break;
+    case "/":
+      break;
+    default:
+      break;
+  }
+});
+
+server.listen(8000);
+```
+
+To test, run server, then open `http://localhost:8000/home` in a browser or in terminal `curl -i localhost:8000/home`.
+
+To also support `/about` route returning `about.html`, make the route dynamic with template string:
+
+```javascript
+server.on("request", (req, res) => {
+  switch (req.url) {
+    case "/home":
+    case "/about":
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(fs.readFileSync(`./${req.url}.html`));
+      break;
+    case "/":
+      break;
+    default:
+      break;
+  }
+});
+```
+
+For root route, redirect user to `/home`, use `res.writeHead(...)` sending `301 to indicate permanently moved.
+
+```javascript
+server.on("request", (req, res) => {
+  switch (req.url) {
+    case "/home":
+    case "/about":
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(fs.readFileSync(`./${req.url}.html`));
+      break;
+    case "/":
+      res.writeHead(301, { Location: "/home" });
+      res.end();
+      break;
+    default:
+      break;
+  }
+});
+```
+
+To work with JSON data, need to send `application/json` content type header, and write stringified version of json data object:
+
+```javascript
+server.on("request", (req, res) => {
+  switch (req.url) {
+    case "/api":
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(data));
+      break;
+    case "/home":
+    // ...
+  }
+});
+```
+
+Use `default` case to respond with 404 because it means server received a route it doesn't know how to handle:
+
+```javascript
+// ...
+default:
+  res.writeHead(404);
+  res.end();
+  break;
+```
+
+To view all available http status codes from repl:
+
+```shell
+node
+> http.STATUS_CODES
+{ '100': 'Continue',
+'101': 'Switching Protocols',
+'102': 'Processing',
+'200': 'OK',
+'201': 'Created',
+'202': 'Accepted',
+'203': 'Non-Authoritative Information',
+'204': 'No Content',
+'205': 'Reset Content',
+'206': 'Partial Content',
+'207': 'Multi-Status',
+'208': 'Already Reported',
+'226': 'IM Used',
+'300': 'Multiple Choices',
+'301': 'Moved Permanently',
+'302': 'Found',
+'303': 'See Other',
+'304': 'Not Modified',
+'305': 'Use Proxy',
+'307': 'Temporary Redirect',
+'308': 'Permanent Redirect',
+'400': 'Bad Request',
+'401': 'Unauthorized',
+'402': 'Payment Required',
+'403': 'Forbidden',
+'404': 'Not Found',
+'405': 'Method Not Allowed',
+'406': 'Not Acceptable',
+'407': 'Proxy Authentication Required',
+'408': 'Request Timeout',
+'409': 'Conflict',
+'410': 'Gone',
+'411': 'Length Required',
+'412': 'Precondition Failed',
+'413': 'Payload Too Large',
+'414': 'URI Too Long',
+'415': 'Unsupported Media Type',
+'416': 'Range Not Satisfiable',
+'417': 'Expectation Failed',
+'418': 'I\'m a teapot',
+'421': 'Misdirected Request',
+'422': 'Unprocessable Entity',
+'423': 'Locked',
+'424': 'Failed Dependency',
+'425': 'Unordered Collection',
+'426': 'Upgrade Required',
+'428': 'Precondition Required',
+'429': 'Too Many Requests',
+'431': 'Request Header Fields Too Large',
+'451': 'Unavailable For Legal Reasons',
+'500': 'Internal Server Error',
+'501': 'Not Implemented',
+'502': 'Bad Gateway',
+'503': 'Service Unavailable',
+'504': 'Gateway Timeout',
+'505': 'HTTP Version Not Supported',
+'506': 'Variant Also Negotiates',
+'507': 'Insufficient Storage',
+'508': 'Loop Detected',
+'509': 'Bandwidth Limit Exceeded',
+'510': 'Not Extended',
+'511': 'Network Authentication Required' }
+```
