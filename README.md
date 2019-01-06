@@ -40,6 +40,7 @@
     - [Working with HTTPS](#working-with-https)
     - [Requesting HTTP/HTTPS Data](#requesting-httphttps-data)
     - [Working with Routes](#working-with-routes)
+    - [Parsing URLs and Query Strings](#parsing-urls-and-query-strings)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2034,4 +2035,122 @@ node
 '509': 'Bandwidth Limit Exceeded',
 '510': 'Not Extended',
 '511': 'Network Authentication Required' }
+```
+
+### Parsing URLs and Query Strings
+
+To parse url's, use `url` module:
+
+```shell
+node
+> url
+{ Url: [Function: Url],
+  parse: [Function: urlParse],
+  resolve: [Function: urlResolve],
+  resolveObject: [Function: urlResolveObject],
+  format: [Function: urlFormat],
+  URL: [Function: URL],
+  URLSearchParams: [Function: URLSearchParams],
+  domainToASCII: [Function: domainToASCII],
+  domainToUnicode: [Function: domainToUnicode] }
+```
+
+[Node docs on url](https://nodejs.org/api/url.html#url_url_strings_and_url_objects)
+
+Example url: `http://user:pass@sub.example.com:8080/p/a/t/h?query=string#hash`
+
+protocol = http
+auth.user = user
+auth.pass = password
+host.hostname = sub.example.com
+host.port = 8080
+path.pathname = /p/a/t/h
+path.search = ?query=string
+path.query = query=string
+hash = #hash
+
+REPL:
+
+```shell
+node
+> url.parse('https://www.pluralsight.com/search?q=buna')
+Url {
+  protocol: 'https:',
+  slashes: true,
+  auth: null,
+  host: 'www.pluralsight.com',
+  port: null,
+  hostname: 'www.pluralsight.com',
+  hash: null,
+  search: '?q=buna',
+  query: 'q=buna',
+  pathname: '/search',
+  path: '/search?q=buna',
+  href: 'https://www.pluralsight.com/search?q=buna' }
+```
+
+Passing second argument `true` will also parse query string:
+
+```shell
+> url.parse('https://www.pluralsight.com/search?q=buna', true)
+Url {
+  protocol: 'https:',
+  slashes: true,
+  auth: null,
+  host: 'www.pluralsight.com',
+  port: null,
+  hostname: 'www.pluralsight.com',
+  hash: null,
+  search: '?q=buna',
+  query: { q: 'buna' },
+  pathname: '/search',
+  path: '/search?q=buna',
+  href: 'https://www.pluralsight.com/search?q=buna' }
+```
+
+To read information from parsed query:
+
+```shell
+> url.parse('https://www.pluralsight.com/search?q=buna', true).query.q
+'buna'
+```
+
+Opposite case - have object with url properties and want to create a url string, use `url.format`:
+
+```shell
+url.format({
+... protocol: 'https',
+... host: 'www.pluralsight.com',
+... search: '?q=buna',
+... pathname: '/search'
+... })
+'https://www.pluralsight.com/search?q=buna'
+```
+
+Can also work with `querystring` module:
+
+```shell
+node
+> querystring
+{ unescapeBuffer: [Function: unescapeBuffer],
+  unescape: [Function: qsUnescape],
+  escape: [Function: qsEscape],
+  stringify: [Function: stringify],
+  encode: [Function: stringify],
+  parse: [Function: parse],
+  decode: [Function: parse] }
+```
+
+Create a valid url encoded query string from an object:
+
+```shell
+> querystring.stringify({name: 'John Doe', website: 'jscomplete.com/john-doe'})
+'name=John%20Doe&website=jscomplete.com%2Fjohn-doe'
+```
+
+Parse querystring into object:
+
+```shell
+> querystring.parse('name=John%20Doe&website=jscomplete.com%2Fjohn-doe')
+{ name: 'John Doe', website: 'jscomplete.com/john-doe' }
 ```
