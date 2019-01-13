@@ -41,6 +41,8 @@
     - [Requesting HTTP/HTTPS Data](#requesting-httphttps-data)
     - [Working with Routes](#working-with-routes)
     - [Parsing URLs and Query Strings](#parsing-urls-and-query-strings)
+  - [Node's Common Built-in Libraries](#nodes-common-built-in-libraries)
+    - [Working with the Operating System](#working-with-the-operating-system)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2154,3 +2156,75 @@ Parse querystring into object:
 > querystring.parse('name=John%20Doe&website=jscomplete.com%2Fjohn-doe')
 { name: 'John Doe', website: 'jscomplete.com/john-doe' }
 ```
+
+## Node's Common Built-in Libraries
+
+### Working with the Operating System
+
+Node provides utilities to access info directly from OS. Use os module: `const os = require('os');`
+
+Use repl to see what's available, eg: getting info about cpus, network, memory, what os was node compiled for
+
+```shell
+node
+> os.
+os.__defineGetter__      os.__defineSetter__      os.__lookupGetter__      os.__lookupSetter__      os.__proto__             os.constructor
+os.hasOwnProperty        os.isPrototypeOf         os.propertyIsEnumerable  os.toLocaleString        os.toString              os.valueOf
+
+os.EOL                   os.arch                  os.constants             os.cpus                  os.endianness            os.freemem
+os.getNetworkInterfaces  os.homedir               os.hostname              os.loadavg               os.networkInterfaces     os.platform
+os.release               os.tmpDir                os.tmpdir                os.totalmem              os.type                  os.uptime
+os.userInfo
+
+> os.cpus()
+[ { model: 'Intel(R)...',
+  speed: 3000,
+  times: { user: 275420, nice: 0, sys: 162520, idle: 3044560, irq: 0 } },
+{ model: 'Intel(R)...',
+  speed: 3000,
+  times: { user: 159800, nice: 0, sys: 67510, idle: 3254660, irq: 0 } },
+{ model: 'Intel(R)...',
+  speed: 3000,
+  times: { user: 265040, nice: 0, sys: 132790, idle: 3084150, irq: 0 } },
+{ model: 'Intel(R)...',
+  speed: 3000,
+  times: { user: 161590, nice: 0, sys: 68670, idle: 3251720, irq: 0 } } ]
+
+> os.networkInterfaces().en0.map(i => i.address)
+[ '192.168.1.2' ]
+
+> os.freemem()
+4058230784
+
+> os.type()
+'Darwin'
+
+> os.release()
+'16...'
+
+> os.userInfo()
+{ uid: 123,
+gid: 11,
+username: 'someuser',
+homedir: '/Users/someuser',
+shell: '/bin/zsh' }
+
+> os.constants.signals
+{ SIGHUP: 1,
+SIGINT: 2,
+SIGQUIT: 3,
+SIGILL: 4,
+SIGTRAP: 5,
+SIGABRT: 6,
+SIGIOT: 6,
+SIGBUS: 10,
+SIGFPE: 8,
+SIGKILL: 9,
+...
+```
+
+`os.type` useful for writing code specific to OS.
+
+`os.userInfo()` returns info about current user.
+
+`os.constants` returns object with all os error codes and process signals.
