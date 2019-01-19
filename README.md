@@ -43,6 +43,7 @@
     - [Parsing URLs and Query Strings](#parsing-urls-and-query-strings)
   - [Node's Common Built-in Libraries](#nodes-common-built-in-libraries)
     - [Working with the Operating System](#working-with-the-operating-system)
+    - [Working with the File System](#working-with-the-file-system)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2228,3 +2229,136 @@ SIGKILL: 9,
 `os.userInfo()` returns info about current user.
 
 `os.constants` returns object with all os error codes and process signals.
+
+### Working with the File System
+
+`fs` module provides file I/O functions. All `fs` module functions have synchronous and asynchronous forms. Which to choose depends on code logic.
+
+[Example](examples/fs/async-vs-sync.js)
+
+async handles errors differently than sync. For async, any errors encountered passed as first argument `err` in callback.
+
+sync functions immediately throw errors. If don't want errors to bubble up, use try/catch.
+
+`readFile/Sync` returns a buffer if character encoding not specified.
+
+To see all the functions on fs module `fs.<tab><tab>` in repl:
+
+```
+> fs.
+fs.__defineGetter__      fs.__defineSetter__      fs.__lookupGetter__      fs.__lookupSetter__      fs.__proto__
+fs.constructor           fs.hasOwnProperty        fs.isPrototypeOf         fs.propertyIsEnumerable  fs.toLocaleString
+fs.toString              fs.valueOf
+
+fs.F_OK                  fs.FileReadStream        fs.FileWriteStream       fs.R_OK                  fs.ReadStream
+fs.Stats                 fs.SyncWriteStream       fs.W_OK                  fs.WriteStream           fs.X_OK
+fs._toUnixTimestamp      fs.access                fs.accessSync            fs.appendFile            fs.appendFileSync
+fs.chmod                 fs.chmodSync             fs.chown                 fs.chownSync             fs.close
+fs.closeSync             fs.constants             fs.copyFile              fs.copyFileSync          fs.createReadStream
+fs.createWriteStream     fs.exists                fs.existsSync            fs.fchmod                fs.fchmodSync
+fs.fchown                fs.fchownSync            fs.fdatasync             fs.fdatasyncSync         fs.fstat
+fs.fstatSync             fs.fsync                 fs.fsyncSync             fs.ftruncate             fs.ftruncateSync
+fs.futimes               fs.futimesSync           fs.lchmod                fs.lchmodSync            fs.lchown
+fs.lchownSync            fs.link                  fs.linkSync              fs.lstat                 fs.lstatSync
+fs.mkdir                 fs.mkdirSync             fs.mkdtemp               fs.mkdtempSync           fs.open
+fs.openSync              fs.read                  fs.readFile              fs.readFileSync          fs.readSync
+fs.readdir               fs.readdirSync           fs.readlink              fs.readlinkSync          fs.realpath
+fs.realpathSync          fs.rename                fs.renameSync            fs.rmdir                 fs.rmdirSync
+fs.stat                  fs.statSync              fs.symlink               fs.symlinkSync           fs.truncate
+fs.truncateSync          fs.unlink                fs.unlinkSync            fs.unwatchFile           fs.utimes
+fs.utimesSync            fs.watch                 fs.watchFile             fs.write                 fs.writeFile
+```
+
+**Examples**
+
+[Task 1](examples/fs/task1.js)
+
+Script to fix files in a directory. Each file has its data duplicated. Truncate each file in half.
+
+To fix a list of files, fist need to read them. Use `readdir/Sync`. Returns array of file names (just names, not full path).
+
+Use `path` module to get full path to a file.
+
+NEVER use string concatenation for file paths, ALWAYS use `path.join` to make code platform agnostic.
+
+`stat` function returns metadata about file such as file size.
+
+To solve task, use `truncate` function with half file size.
+
+```javascript
+const fs = require("fs");
+const path = require("path");
+
+const dirname = path.join(__dirname, "data");
+const files = fs.readdirSync(dirname);
+
+files.forEach(file => {
+  const filePath = path.join(dirname, file);
+  fs.stat(filePath, (err, stats) => {
+    if (err) throw err;
+
+    fs.truncate(filePath, stats.size / 2, err => {
+      if (err) throw err;
+    });
+  });
+});
+```
+
+[Task 2](examples/fs/task2.js)
+
+Script to clean old files in a directory.
+Anything older than 7 days should be deleted. BUT, do not have access to the actual directory, so first need to [seed](examples/fs/seed.js) some test data.
+
+Create 10 sample files with `writeFile`, changing each file's timestamp using `utimes`. (accestime and modifytime). Arguments must be unix timestamp in seconds.
+
+```shell
+node seed.js
+ll data2
+total 80
+-rw-r--r--  1 someuser  staff     1B Jan 19 18:27 file0
+-rw-r--r--  1 someuser  staff     1B Jan 18 18:27 file1
+-rw-r--r--  1 someuser  staff     1B Jan 17 18:27 file2
+-rw-r--r--  1 someuser  staff     1B Jan 16 18:27 file3
+-rw-r--r--  1 someuser  staff     1B Jan 15 18:27 file4
+-rw-r--r--  1 someuser  staff     1B Jan 14 18:27 file5
+-rw-r--r--  1 someuser  staff     1B Jan 13 18:27 file6
+-rw-r--r--  1 someuser  staff     1B Jan 12 18:27 file7
+-rw-r--r--  1 someuser  staff     1B Jan 11 18:27 file8
+-rw-r--r--  1 someuser  staff     1B Jan 10 18:27 file9
+```
+
+Now the cleanup script should remove files 7, 8, and 9. Iterate all files in dir, reading stats metadata for each file. Check `mtime` modified time, use `unlink` to delete if wasn't modified in last 7 days. `mtime` returns Date object.
+
+```javascript
+const fs = require("fs");
+const path = require("path");
+
+const dirname = path.join(__dirname, "data2");
+const ms1Day = 24 * 60 * 60 * 1000;
+
+files.forEach(file => {
+  const filePath = path.join(dirname, file);
+  fs.stat(filePath, (err, stats) => {
+    if (err) throw err;
+
+    if (Date.now() - stats.mtime.getTime() > 7 * ms1Day) {
+      fs.unlink(filePath, err => {
+        if (err) throw err;
+        console.log(`deleted ${filePath}`);
+      });
+    }
+  });
+});
+```
+
+[Task 3](examples/fs/task3.js)
+
+Watch a directory and report 3 events:
+
+- file was added
+- file was removed
+- file was changed
+
+Use `fs.watch` but doesn't provide enough detail for above 3 events. Both add and delete are reported as `rename` event.
+
+WARNING: `fs.watch` api not consistent across environments!
