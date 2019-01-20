@@ -46,6 +46,8 @@
     - [Working with the File System](#working-with-the-file-system)
     - [Console and Utilities](#console-and-utilities)
     - [Debugging Node.js Applications](#debugging-nodejs-applications)
+  - [Working with Streams](#working-with-streams)
+    - [Stream All the Things!](#stream-all-the-things)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2805,3 +2807,110 @@ curl http://127.0.0.1:9229/json/list
 ```
 
 To use chrome devtools, open browser with url: `chrome-devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/539ba5a7-3b55-4975-bf14-cdd1b2a55a30`
+
+## Working with Streams
+
+### Stream All the Things!
+
+Use when working with large amounts of data. Streams give power of composability. Similar to how linux commands can be composed by piping smaller commands, eg:
+
+```shell
+$ git grep require | grep -v // | wc -ls
+66
+```
+
+Many built-in modules in node implement Stream interface, examples:
+
+![streams](images/streams.png "streams")
+
+Some are both readable and writeable.
+
+**What are Streams?**
+
+Collections of data that might not be available all at once and don't have to fit in memory.
+
+Demo difference streams make in memory consumption. Start with [create-big-file](examples/stream/create-big-file.js) to write 1,000,000 lines of lorem ipsum text to a file.
+
+`fs` module can be used to read/write files using stream interface.
+
+```javascript
+const fs = require("fs");
+const file = fs.createWriteStream("./bigfile");
+
+for (let i = 0; i <= 1e6; i++) {
+  file.write(
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum"
+  );
+}
+
+file.end();
+```
+
+Generates ~400MB file:
+
+```shell
+cd examples/stream
+node create-big-file.js
+ls -lh bigfile
+-rw-r--r--  1 dbaron  staff   423M Jan 20 18:14 bigfile
+```
+
+Serve file with a simple http [server](examples/stream/server.js) using `readFile`, and writing response on its callback:
+
+```javascript
+const fs = require("fs");
+const server = require("http").createServer();
+
+server.on("request", (req, res) => {
+  fs.readFile("./bigfile", (err, data) => {
+    if (err) throw err;
+
+    res.end(data);
+  });
+});
+
+server.listen(8000);
+```
+
+Run the server with `node server.js`, then use Activity Monitor app to monitor node memory usage.
+
+To start, process using ~8.9M of memory -> normal.
+
+Open another terminal and request file:
+
+```shell
+curl -i localhost:8000
+```
+
+Memory spikes to over 400M of memory. Because code is bufferring ENTIRE bigfile in memory before writing it out to http response.
+
+More efficient way is to make use of fact that http response object is also a writeable stream.
+
+Create a readable stream from bigfile, then pipe it to http response:
+
+[server-stream](examples/stream/server-stream.js)
+
+```javascript
+const fs = require("fs");
+const server = require("http").createServer();
+
+server.on("request", (req, res) => {
+  const src = fs.createReadStream("./bigfile");
+  src.pipe(res);
+});
+
+server.listen(8000);
+```
+
+Now when file is requested, server memory only goes up to ~40-45M. Because data is being streamed one chunk at a time rather than buferred in memory all at once.
+
+To push example even further, increase loop size in create-big-file-js to 5 million. This makes bigfile > 2G which is greater than default buffer limit in node.
+
+Now try to serve it with naive `readFile`: `node server.js`. Fails!
+
+```
+RangeError: File size is greater than possible Buffer: 0x7fffffff bytes
+at FSReqWrap.readFileAfterStat [as oncomplete] (fs.js:453:11)
+```
+
+But with `node server-stream.js`, works and process is memory is roughly the same as when serving slightly smaller file.

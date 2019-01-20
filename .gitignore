@@ -1,3 +1,4 @@
 examples/know-npm/node_modules
+examples/stream/bigfile
 *.pem
 *.crt
