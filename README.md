@@ -44,6 +44,7 @@
   - [Node's Common Built-in Libraries](#nodes-common-built-in-libraries)
     - [Working with the Operating System](#working-with-the-operating-system)
     - [Working with the File System](#working-with-the-file-system)
+    - [Console and Utilities](#console-and-utilities)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2362,3 +2363,176 @@ Watch a directory and report 3 events:
 Use `fs.watch` but doesn't provide enough detail for above 3 events. Both add and delete are reported as `rename` event.
 
 WARNING: `fs.watch` api not consistent across environments!
+
+### Console and Utilities
+
+`console` module is designed to provide same features as `console` object in web browsers (log, info, warn, error, dir, time, timeEnd, trace, assert).
+
+Also have `console.Console` class that can be used to write to any Node.js stream.
+
+Global console object already configured to write to stdout and stderr.
+
+Eg, write to a different stream than stdout/stderr:
+
+```javascript
+const fs = require("fs");
+
+const out = fs.createWriteStream("./out.log");
+const err = fs.createWriteStream("./err.log");
+
+const console2 = new console.Console(out, err);
+
+setInterval(() => {
+  console2.log(new Date());
+  console2.error(new Error("Whoops"));
+}, 5000);
+```
+
+`console.log` uses `util` module to format and output a message with a new line.
+
+printf formatting is supported:
+
+```javascript
+> console.log('One %s', 'thing')
+One thing
+```
+
+- `%d` for number
+- `%s` for string
+- `%j` for json object
+
+To access printf substitutions without console.log, use `util.format`, which returns the formatted string:
+
+```javascript
+> util.format('One %s', 'thing')
+'One thing'
+```
+
+When console.log is called on an object, node uses `util.inspect(obj)` to print string representation of the object.
+
+`util.inspect` returns string.
+
+`util.inspect` has second options argument used to control output.
+
+Only use first depth of object:
+
+```javascript
+> util.inspect(global, { depth: 0 })
+'{ console: [Getter],\n  DTRACE_NET_SERVER_CONNECTION: [Function],\n  DTRACE_NET_STREAM_END: [Function],\n  DTRACE_HTTP_SERVER_REQUEST: [Func
+tion],\n  DTRACE_HTTP_SERVER_RESPONSE: [Function],\n  DTRACE_HTTP_CLIENT_REQUEST: [Function],\n  DTRACE_HTTP_CLIENT_RESPONSE: [Function],\n
+global: [Circular],\n  process: [Object],\n  Buffer: [Object],\n  clearImmediate: [Function],\n  clearInterval: [Function],\n  clearTimeout:
+[Function],\n  setImmediate: [Object],\n  setInterval: [Function],\n  setTimeout: [Object],\n  module: [Object],\n  require: [Object] }'
+```
+
+To use inspect's second argument and print to stdout/err, use `console.dir`:
+
+```javascript
+> console.dir(global, { depth: 0 })
+{ console: [Getter],
+  DTRACE_NET_SERVER_CONNECTION: [Function],
+  DTRACE_NET_STREAM_END: [Function],
+  DTRACE_HTTP_SERVER_REQUEST: [Function],
+  DTRACE_HTTP_SERVER_RESPONSE: [Function],
+  DTRACE_HTTP_CLIENT_REQUEST: [Function],
+  DTRACE_HTTP_CLIENT_RESPONSE: [Function],
+  global: [Circular],
+  process: [Object],
+  Buffer: [Object],
+  clearImmediate: [Function],
+  clearInterval: [Function],
+  clearTimeout: [Function],
+  setImmediate: [Object],
+  setInterval: [Function],
+  setTimeout: [Object],
+  module: [Object],
+  require: [Object] }
+```
+
+`console.info` is alias to `console.log`.
+
+`console.error` behaves the same as info but writes to stderr instead of stdout.
+
+`console.warn` is alias for `console.error`.
+
+`console.assert` tests if argument is true, throws assertion error when not true
+
+```javascript
+> console.assert(3 == '3')
+undefined
+> console.assert(3 === '3')
+AssertionError [ERR_ASSERTION]: false == true
+    at Console.assert (console.js:194:23)
+```
+
+Built-in `assert` module has a lot more features than `console.assert`:
+
+```javascript
+> assert
+{ [Function: ok]
+  fail: [Function: fail],
+  AssertionError: [Function: AssertionError],
+  ok: [Circular],
+  equal: [Function: equal],
+  notEqual: [Function: notEqual],
+  deepEqual: [Function: deepEqual],
+  deepStrictEqual: [Function: deepStrictEqual],
+  notDeepEqual: [Function: notDeepEqual],
+  notDeepStrictEqual: [Function: notDeepStrictEqual],
+  strictEqual: [Function: strictEqual],
+  notStrictEqual: [Function: notStrictEqual],
+  throws: [Function: throws],
+  doesNotThrow: [Function: doesNotThrow],
+  ifError: [Function: ifError] }
+```
+
+`console.trace` behaves like `console.error` but also prints call stack at the point where it's called:
+
+```javascript
+> console.trace('here)
+Trace: here
+at repl:1:9
+at ContextifyScript.Script.runInThisContext (vm.js:50:33)
+at REPLServer.defaultEval (repl.js:240:29)
+at bound (domain.js:301:14)
+at REPLServer.runBound [as eval] (domain.js:314:12)
+at REPLServer.onLine (repl.js:468:10)
+at emitOne (events.js:121:20)
+at REPLServer.emit (events.js:211:7)
+at REPLServer.Interface._onLine (readline.js:280:10)
+at REPLServer.Interface._line (readline.js:629:8)
+```
+
+`util.debugLog` to conditionally write debug messages to stderr based on existence of NODE_DEBUG environment variable:
+
+```javascript
+// debug-log.js
+const util = require("util");
+const debuglog = util.debuglog("web");
+
+const server = require("http").createServer();
+
+server.on("request", (req, res) => {
+  // will only be written if NODE_DEBUG=web
+  debuglog("Http Request: %s", req.url);
+  res.writeHead(200, { "content-type": "text/plain" });
+  res.end("Hello world\n");
+});
+
+server.listen(8000);
+```
+
+`node debug-log.js` will not write any debug to stdout but `NODE_DEBUG=web node debug-log.js` will.
+
+`util.deprecate` to wrap a function in deprecation notice:
+
+```javascript
+const util = require('util')
+
+module.exports.puts = util.deprecate(() => {
+  for (var i = 0; len = arguments.length; i < len; ++i) {
+    process.stdout.write(arguments[i] + '\n');
+  }
+}, 'puts: Use console.log instead');
+```
+
+`util.inherits` was used before ES2015 classes to inherit prototype methods from one constructor to another.

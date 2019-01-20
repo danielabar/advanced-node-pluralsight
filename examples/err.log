@@ -1,0 +1,20 @@
+Error: Whoops
+    at Timeout.setInterval [as _onTimeout] (/Users/dbaron/projects/pluralsight/advanced-node-pluralsight/examples/console-stream.js:10:18)
+    at ontimeout (timers.js:498:11)
+    at tryOnTimeout (timers.js:323:5)
+    at Timer.listOnTimeout (timers.js:290:5)
+Error: Whoops
+    at Timeout.setInterval [as _onTimeout] (/Users/dbaron/projects/pluralsight/advanced-node-pluralsight/examples/console-stream.js:10:18)
+    at ontimeout (timers.js:498:11)
+    at tryOnTimeout (timers.js:323:5)
+    at Timer.listOnTimeout (timers.js:290:5)
+Error: Whoops
+    at Timeout.setInterval [as _onTimeout] (/Users/dbaron/projects/pluralsight/advanced-node-pluralsight/examples/console-stream.js:10:18)
+    at ontimeout (timers.js:498:11)
+    at tryOnTimeout (timers.js:323:5)
+    at Timer.listOnTimeout (timers.js:290:5)
+Error: Whoops
+    at Timeout.setInterval [as _onTimeout] (/Users/dbaron/projects/pluralsight/advanced-node-pluralsight/examples/console-stream.js:10:18)
+    at ontimeout (timers.js:498:11)
+    at tryOnTimeout (timers.js:323:5)
+    at Timer.listOnTimeout (timers.js:290:5)
