@@ -45,6 +45,7 @@
     - [Working with the Operating System](#working-with-the-operating-system)
     - [Working with the File System](#working-with-the-file-system)
     - [Console and Utilities](#console-and-utilities)
+    - [Debugging Node.js Applications](#debugging-nodejs-applications)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2536,3 +2537,271 @@ module.exports.puts = util.deprecate(() => {
 ```
 
 `util.inherits` was used before ES2015 classes to inherit prototype methods from one constructor to another.
+
+### Debugging Node.js Applications
+
+Node comes with built-in debugger.
+
+[Example code with bug](examples/debug-neg-sum.js)
+
+To use built-in debugger to step through code:
+
+**Course said to use debug but deprecated, now should use inspect**
+
+```shell
+cd examples
+node inspect debug-neg-sum.js
+< Debugger listening on ws://127.0.0.1:9229/b0c19d55-2499-485d-b5d4-55c269d7f720
+< For help see https://nodejs.org/en/docs/inspector
+< Debugger attached.
+Break on start in debug-neg-sum.js:1
+> 1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+  2   return args.reduce((arg, total) => {
+  3     return total - arg;
+debug>
+```
+
+Debugger is listening on port 9229. Node communicates with debugger on this port.
+
+`help` to see available commands
+
+```shell
+debug> help
+run, restart, r       Run the application or reconnect
+kill                  Kill a running application or disconnect
+
+cont, c               Resume execution
+next, n               Continue to next line in current file
+step, s               Step into, potentially entering a function
+out, o                Step out, leaving the current function
+backtrace, bt         Print the current backtrace
+list                  Print the source around the current line where execution
+                      is currently paused
+
+setBreakpoint, sb     Set a breakpoint
+clearBreakpoint, cb   Clear a breakpoint
+breakpoints           List all known breakpoints
+breakOnException      Pause execution whenever an exception is thrown
+breakOnUncaught       Pause execution whenever an exception isn't caught
+breakOnNone           Don't pause on exceptions (this is the default)
+
+watch(expr)           Start watching the given expression
+unwatch(expr)         Stop watching an expression
+watchers              Print all watched expressions and their current values
+
+exec(expr)            Evaluate the expression and print the value
+repl                  Enter a debug repl that works like exec
+
+scripts               List application scripts that are currently loaded
+scripts(true)         List all scripts (including node-internals)
+
+profile               Start CPU profiling session.
+profileEnd            Stop current CPU profiling session.
+profiles              Array of completed CPU profiling sessions.
+profiles[n].save(filepath = 'node.cpuprofile')
+                      Save CPU profiling session to disk as JSON.
+
+takeHeapSnapshot(filepath = 'node.heapsnapshot')
+                      Take a heap snapshot and save to disk as JSON.
+```
+
+Node starts debugger in break state. Entering `c` for continue, script will continue and output incorrect answer.
+
+To try again, enter `restart` command:
+
+```shell
+debug> r
+< Debugger listening on ws://127.0.0.1:9229/87f087c3-41f6-4f7f-9f6b-a797f99050e2
+< For help see https://nodejs.org/en/docs/inspector
+< Debugger attached.
+Break on start in debug-neg-sum.js:1
+> 1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+  2   return args.reduce((arg, total) => {
+  3     return total - arg;
+debug>
+```
+
+Use `sb` command to set a breakpoint:
+
+```shell
+debug> sb(2)
+  1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+> 2   return args.reduce((arg, total) => {
+  3     return total - arg;
+  4   }, 0);
+  5 }
+  6
+  7 console.log(negativeSum(1, 5, 10)); // expect -16, actual 6
+debug>
+```
+
+Use continue to get code to continue on to line 2:
+
+```shell
+debug> c
+break in debug-neg-sum.js:2
+  1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+> 2   return args.reduce((arg, total) => {
+  3     return total - arg;
+  4   }, 0);
+debug>
+```
+
+Now debugger is breaking at line 2, can inspect any accessible variables at this point using `repl`:
+
+```shell
+debug> repl
+Press Ctrl + C to leave debug repl
+>
+```
+
+Inspect `args`:
+
+```shell
+> args
+[ 1, 5, 10 ]
+>
+```
+
+`args` value looks, correct so problem likely in reduce callback. Add another breakpoint on line 3:
+
+```shell
+> ctrl+c to exit repl
+debug> sb(3)
+  1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+* 2   return args.reduce((arg, total) => {
+> 3     return total - arg;
+  4   }, 0);
+  5 }
+  6
+  7 console.log(negativeSum(1, 5, 10)); // expect -16, actual 6
+  8
+```
+
+Since line 3 is in a loop, debugger will break 3 times, once for each arg. Rather than manually inspecting variables each time, use `watch` command, then continue:
+
+```shell
+debug> watch('arg')
+debug> watch('total')
+debug> c
+break in debug-neg-sum.js:3
+Watchers:
+  0: arg = 0
+  1: total = 1
+
+  1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+* 2   return args.reduce((arg, total) => {
+> 3     return total - arg;
+  4   }, 0);
+  5 }
+debug>
+```
+
+First round through loop watcher is reporting `total = 1` and `arg = 0` but this is reversed. Was expecting total, i.e. initial state of reduction to be 0, and arg as first argument to be 1.
+
+To verify continue again to next iteration:
+
+```shel
+debug> c
+break in debug-neg-sum.js:3
+Watchers:
+  0: arg = 1
+  1: total = 5
+
+  1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+* 2   return args.reduce((arg, total) => {
+> 3     return total - arg;
+  4   }, 0);
+  5 }
+debug>
+```
+
+Now total showing 5, which is actually second argument in array.
+
+Continue again:
+
+```shell
+debug> c
+break in debug-neg-sum.js:3
+Watchers:
+  0: arg = 4
+  1: total = 10
+
+  1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+* 2   return args.reduce((arg, total) => {
+> 3     return total - arg;
+  4   }, 0);
+  5 }
+debug>
+```
+
+**CONCLUSION FROM DEBUG**
+
+Order of `arg` and `total` in reduce callback are reversed.
+
+BAD:
+
+```javascript
+function negativeSum(...args) {
+  return args.reduce((arg, total) => {
+    return total - arg;
+  }, 0);
+}
+
+console.log(negativeSum(1, 5, 10)); // expect -16, actual 6
+```
+
+GOOD:
+
+```javascript
+function negativeSum(...args) {
+  return args.reduce((total, arg) => {
+    return total - arg;
+  }, 0);
+}
+
+console.log(negativeSum(1, 5, 10)); // expect -16, actual 6
+```
+
+To clear screen during debug session: Ctrl + L
+
+To get back context, `list` command will display that many lines before and after current breakpoint:
+
+```shell
+debug> list(3)
+  1 (function (exports, require, module, __filename, __dirname) { function negativeSum(...args) {
+* 2   return args.reduce((arg, total) => {
+> 3     return total - arg;
+  4   }, 0);
+  5 }
+  6
+debug>
+```
+
+Can also integrate with chrome devtools. This mode does not break by default so have to add `--debug-brk` flag:
+
+NOTE: Instructions have changed since course.
+
+```shell
+node --inspect --debug-brk debug-neg-sum.js
+Debugger listening on ws://127.0.0.1:9229/5167e161-a973-481c-bbed-e3468820c417
+For help see https://nodejs.org/en/docs/inspector
+```
+
+In another terminal:
+
+```shell
+curl http://127.0.0.1:9229/json/list
+[ {
+  "description": "node.js instance",
+  "devtoolsFrontendUrl": "chrome-devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/539ba5a7-3b55-4975-bf14-cdd1b2a55a30",
+  "faviconUrl": "https://nodejs.org/static/favicon.ico",
+  "id": "539ba5a7-3b55-4975-bf14-cdd1b2a55a30",
+  "title": "debug-neg-sum.js",
+  "type": "node",
+  "url": "file:///Users/dbaron/projects/pluralsight/advanced-node-pluralsight/examples/debug-neg-sum.js",
+  "webSocketDebuggerUrl": "ws://127.0.0.1:9229/539ba5a7-3b55-4975-bf14-cdd1b2a55a30"
+} ]
+```
+
+To use chrome devtools, open browser with url: `chrome-devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/539ba5a7-3b55-4975-bf14-cdd1b2a55a30`
